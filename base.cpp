@@ -184,7 +184,7 @@ class ToBaseN : public Converter {
 		static constexpr size_t quantum_bits = lcm(8, shift);
 		static constexpr size_t quantum_chars = quantum_bits / shift;
 
-		static_assert(quantum_bits < sizeof(uint64_t) << 3);
+		static_assert(quantum_bits < sizeof(uint64_t) * 8);
 		uint64_t buffer = 0;
 		uint8_t num_bits = 0;
 		
@@ -240,7 +240,7 @@ class FromBaseN : public Converter {
 		static constexpr size_t quantum_bits = lcm(8, shift);
 		static constexpr size_t quantum_chars = quantum_bits / shift;
 
-		static_assert(quantum_bits < sizeof(uint64_t) << 3);
+		static_assert(quantum_bits < sizeof(uint64_t) * 8);
 		uint64_t buffer = 0;
 		uint8_t num_bits = 0;
 		uint8_t padding_bits = 0;
@@ -288,7 +288,7 @@ class FromNix32 : public Converter {
 			if ((input.size() + 7) * 5 / 8 == (input.size() + 8) * 5 / 8)
 				throw std::runtime_error("Invalid nix32 length");
 			size_t num_zeroes = input.size() * 5 % 8;
-			int zero_mask = ((1 << num_zeroes) - 1) << (4 - num_zeroes);
+			int zero_mask = ((1 << num_zeroes) - 1) << (5 - num_zeroes);
 			if (inverse.at(input[0]) & zero_mask)
 				throw std::runtime_error("Invalid nix32 hash");
 
