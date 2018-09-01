@@ -77,34 +77,28 @@ char toSymbol(char byte)
 	throw std::logic_error("Invalid call");
 }
 
+const char base16_symbols[] = "0123456789ABCDEF";
+static_assert(sizeof(base16_symbols) == 16 + 1);
+
 template <>
 char toSymbol<EncodingType::Base16>(char byte) {
-	byte &= 0xf;
-	if (byte < 10)
-		return byte + '0';
-	return byte + 'A' - 10;
+	return base16_symbols[byte & 0xf];
 }
+
+const char base32_symbols[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+static_assert(sizeof(base32_symbols) == 32 + 1);
 
 template <>
 char toSymbol<EncodingType::Base32>(char byte) {
-	byte &= 0x1f;
-	if (byte < 26)
-		return byte + 'A';
-	return byte + '2' - 26;
+	return base32_symbols[byte & 0x1f];
 }
+
+const char base64_symbols[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static_assert(sizeof(base64_symbols) == 64 + 1);
 
 template <>
 char toSymbol<EncodingType::Base64>(char byte) {
-	byte &= 0x3f;
-	if (byte < 26)
-		return byte + 'A';
-	if (byte < 52)
-		return byte + 'a' - 26;
-	if (byte < 62)
-		return byte + '0' - 52;
-	if (byte == 62)
-		return '+';
-	return '/';
+	return base64_symbols[byte & 0x3f];
 }
 
 template <EncodingType type>
