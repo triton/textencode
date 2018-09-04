@@ -59,37 +59,6 @@ constexpr size_t lcm(size_t a, size_t b)
 }
 
 template <EncodingType type>
-char toSymbol(char byte)
-{
-	(void)byte;
-	throw std::logic_error("Invalid call");
-}
-
-const char base16_symbols[] = "0123456789ABCDEF";
-static_assert(sizeof(base16_symbols) == 16 + 1);
-
-template <>
-char toSymbol<EncodingType::Base16>(char byte) {
-	return base16_symbols[byte & 0xf];
-}
-
-const char base32_symbols[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-static_assert(sizeof(base32_symbols) == 32 + 1);
-
-template <>
-char toSymbol<EncodingType::Base32>(char byte) {
-	return base32_symbols[byte & 0x1f];
-}
-
-const char base64_symbols[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-static_assert(sizeof(base64_symbols) == 64 + 1);
-
-template <>
-char toSymbol<EncodingType::Base64>(char byte) {
-	return base64_symbols[byte & 0x3f];
-}
-
-template <EncodingType type>
 char fromSymbol(char symbol)
 {
 	(void)symbol;
@@ -217,7 +186,7 @@ class ToBaseN : public Converter, protected Common<type> {
 			ret.reserve(ToBaseN::quantum_chars);
 			flushBuffer(ret);
 			if (num_bits > 0)
-				ret += toSymbol<type>(buffer << (ToBaseN::shift - num_bits));
+				ret += toSymbol(buffer << (ToBaseN::shift - num_bits));
 			ret.resize(ToBaseN::quantum_chars, '=');
 			return ret;
 		}
@@ -229,7 +198,11 @@ class ToBaseN : public Converter, protected Common<type> {
 		
 		void flushBuffer(std::string &out) {
 			for (; num_bits >= ToBaseN::shift; num_bits -= ToBaseN::shift)
-				out += toSymbol<type>(buffer >> (num_bits - ToBaseN::shift));
+				out += toSymbol(buffer >> (num_bits - ToBaseN::shift));
+		}
+
+		static char toSymbol(char byte) {
+			return ToBaseN::symbols[byte & (ToBaseN::symbols.size() - 1)];
 		}
 };
 
