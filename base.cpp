@@ -192,8 +192,8 @@ class ToBaseN : public Converter, protected Common<type> {
 		}
 
 	private:
-		static_assert(ToBaseN::quantum_bits < sizeof(uint64_t) * 8);
 		uint64_t buffer = 0;
+		static_assert(ToBaseN::quantum_bits < sizeof(decltype(buffer)) * 8);
 		uint8_t num_bits = 0;
 		
 		void flushBuffer(std::string &out) {
@@ -244,8 +244,8 @@ class FromBaseN : public Converter, protected Common<type> {
 		}
 
 	private:
-		static_assert(FromBaseN::quantum_bits < sizeof(uint64_t) * 8);
 		uint64_t buffer = 0;
+		static_assert(FromBaseN::quantum_bits < sizeof(decltype(buffer)) * 8);
 		uint8_t num_bits = 0;
 		uint8_t padding_bits = 0;
 
