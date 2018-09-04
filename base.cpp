@@ -58,6 +58,12 @@ constexpr size_t lcm(size_t a, size_t b)
 	return a * b;
 }
 
+enum class CharCodes : char {
+	Invalid = -1,
+	Ignore = -2,
+	Padding = -3,
+};
+
 template <EncodingType type>
 class Properties
 {
@@ -92,6 +98,19 @@ class Properties<EncodingType::Base32>
 };
 
 template <>
+class Properties<EncodingType::Nix32>
+{
+	protected:
+		// 0..9 + a..z - {e,o,t,u}
+		static constexpr std::array<char, 32> symbols = {
+			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+			'a', 'b', 'c', 'd', 'f', 'g', 'h', 'i', 'j', 'k',
+			'l', 'm', 'n', 'p', 'q', 'r', 's', 'v', 'w', 'x',
+			'y', 'z',
+		};
+};
+
+template <>
 class Properties<EncodingType::Base64>
 {
 	protected:
@@ -118,24 +137,32 @@ class Common : public Properties<type>
 		static constexpr size_t quantum_chars = quantum_bits / shift;
 
 		static constexpr auto inverse = []() {
+			// Allow use of negatives as sentinel values
 			static_assert(shift < 8);
+
 			std::array<char, 256> ret{};
 			for (size_t i = 0; i < ret.size(); ++i)
-				ret[i] = -1;
-			for (size_t i = 0; i < Common::symbols.size(); ++i) {
-				const char symbol = Common::symbols[i];
-				ret[symbol] = i;
-				if (symbol >= 'A' && symbol <= 'Z') {
-					const char other = symbol - 'A' + 'a';
-					if (ret[other] == -1)
-						ret[other] = i;
-				}
-				if (symbol >= 'a' && symbol <= 'z') {
-					const char other = symbol - 'a' + 'A';
-					if (ret[other] == -1)
-						ret[other] = i;
-				}
-			}
+				ret[i] = static_cast<char>(CharCodes::Invalid);
+
+			for (size_t i = 0; i < Common::symbols.size(); ++i)
+				ret[Common::symbols[i]] = i;
+
+			for (char i = 'A'; i <= 'Z'; ++i)
+				if (ret[i] == static_cast<char>(CharCodes::Invalid))
+					ret[i] = ret[i - 'A' + 'a'];
+			for (char i = 'a'; i <= 'z'; ++i)
+				if (ret[i] == static_cast<char>(CharCodes::Invalid))
+					ret[i] = ret[i - 'a' + 'A'];
+
+			assert(ret[' '] == static_cast<char>(CharCodes::Invalid));
+			ret[' '] = static_cast<char>(CharCodes::Ignore);
+			assert(ret['\r'] == static_cast<char>(CharCodes::Invalid));
+			ret['\r'] = static_cast<char>(CharCodes::Ignore);
+			assert(ret['\n'] == static_cast<char>(CharCodes::Invalid));
+			ret['\n'] = static_cast<char>(CharCodes::Ignore);
+			assert(ret['='] == static_cast<char>(CharCodes::Invalid));
+			ret['='] = static_cast<char>(CharCodes::Padding);
+
 			return ret;
 		}();
 
@@ -190,10 +217,13 @@ class FromBaseN : public Converter, protected Common<type> {
 		std::string process(std::string_view data) override {
 			std::string ret;
 			ret.reserve(data.size());
-			for (char byte : data) {
-				if (byte == ' ' || byte == '\n' || byte == '\r')
+			for (char symbol : data) {
+				char byte = FromBaseN::inverse[symbol];
+				if (byte == static_cast<char>(CharCodes::Invalid))
+					throw std::runtime_error("Invalid symbol");
+				if (byte == static_cast<char>(CharCodes::Ignore))
 					continue;
-				if (byte == '=') {
+				if (byte == static_cast<char>(CharCodes::Padding)) {
 					padding_bits += FromBaseN::shift;
 					continue;
 				}
@@ -202,7 +232,7 @@ class FromBaseN : public Converter, protected Common<type> {
 
 				if (num_bits == FromBaseN::quantum_bits)
 					flushBuffer(ret);
-				buffer = (buffer << FromBaseN::shift) | fromSymbol(byte);
+				buffer = (buffer << FromBaseN::shift) | byte;
 				num_bits += FromBaseN::shift;
 			}
 			return ret;
@@ -235,20 +265,9 @@ class FromBaseN : public Converter, protected Common<type> {
 			for (; num_bits >= 8; num_bits -= 8)
 				out += buffer >> (num_bits - 8);
 		}
-
-		char fromSymbol(char symbol) {
-			char ret = FromBaseN::inverse[symbol];
-			if (ret == -1)
-				throw std::runtime_error("Invalid symbol");
-			return ret;
-		}
 };
 
-// Must be lower case
-constexpr std::string_view nix32_symbols = "0123456789abcdfghijklmnpqrsvwxyz";
-static_assert(nix32_symbols.size() == 32);
-
-class ToNix32 : public Converter {
+class ToNix32 : public Converter, protected Common<EncodingType::Nix32> {
 	public:
 		std::string process(std::string_view data) override {
 			input += data;
@@ -265,13 +284,8 @@ class ToNix32 : public Converter {
 		std::string input;
 };
 
-class FromNix32 : public Converter {
+class FromNix32 : public Converter, protected Common<EncodingType::Nix32> {
 	public:
-		FromNix32() {
-			for (char i = 0; i < 32; ++i)
-				inverse[nix32_symbols[i]] = i;
-		}
-
 		std::string process(std::string_view data) override {
 			input += data;
 			return {};
@@ -282,7 +296,7 @@ class FromNix32 : public Converter {
 				throw std::runtime_error("Invalid nix32 length");
 			size_t num_zeroes = input.size() * 5 % 8;
 			int zero_mask = ((1 << num_zeroes) - 1) << (5 - num_zeroes);
-			if (inverse.at(input[0]) & zero_mask)
+			if (inverse[input[0]] & zero_mask)
 				throw std::runtime_error("Invalid nix32 hash");
 
 			std::string ret;
@@ -292,7 +306,6 @@ class FromNix32 : public Converter {
 
 	private:
 		std::string input;
-		std::unordered_map<char, char> inverse;
 };
 
 using Map = std::unordered_map<EncodingType, std::function<std::unique_ptr<converter::Converter>()>>;
