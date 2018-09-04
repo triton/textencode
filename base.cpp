@@ -156,6 +156,11 @@ class Properties
 template <EncodingType type>
 class Common : public Properties<type>
 {
+	public:
+		static constexpr size_t shift = shiftWidth<type>();
+		static constexpr size_t quantum_bits = lcm(8, shift);
+		static constexpr size_t quantum_chars = quantum_bits / shift;
+
 };
 
 template <EncodingType type>
@@ -165,7 +170,7 @@ class ToBaseN : public Converter, protected Common<type> {
 			std::string ret;
 			ret.reserve(data.size() << 1);
 			for (auto byte : data) {
-				if (num_bits == quantum_bits)
+				if (num_bits == ToBaseN::quantum_bits)
 					flushBuffer(ret);
 				buffer = (buffer << 8) | (byte & 0xff);
 				num_bits += 8;
@@ -178,26 +183,22 @@ class ToBaseN : public Converter, protected Common<type> {
 				return {};
 
 			std::string ret;
-			ret.reserve(quantum_chars);
+			ret.reserve(ToBaseN::quantum_chars);
 			flushBuffer(ret);
 			if (num_bits > 0)
-				ret += toSymbol<type>(buffer << (shift - num_bits));
-			ret.resize(quantum_chars, '=');
+				ret += toSymbol<type>(buffer << (ToBaseN::shift - num_bits));
+			ret.resize(ToBaseN::quantum_chars, '=');
 			return ret;
 		}
 
 	private:
-		static constexpr size_t shift = shiftWidth<type>();
-		static constexpr size_t quantum_bits = lcm(8, shift);
-		static constexpr size_t quantum_chars = quantum_bits / shift;
-
-		static_assert(quantum_bits < sizeof(uint64_t) * 8);
+		static_assert(ToBaseN::quantum_bits < sizeof(uint64_t) * 8);
 		uint64_t buffer = 0;
 		uint8_t num_bits = 0;
 		
 		void flushBuffer(std::string &out) {
-			for (; num_bits >= shift; num_bits -= shift)
-				out += toSymbol<type>(buffer >> (num_bits - shift));
+			for (; num_bits >= ToBaseN::shift; num_bits -= ToBaseN::shift)
+				out += toSymbol<type>(buffer >> (num_bits - ToBaseN::shift));
 		}
 };
 
@@ -211,24 +212,24 @@ class FromBaseN : public Converter, protected Common<type> {
 				if (byte == ' ' || byte == '\n' || byte == '\r')
 					continue;
 				if (byte == '=') {
-					padding_bits += shift;
+					padding_bits += FromBaseN::shift;
 					continue;
 				}
 				if (padding_bits > 0)
 					throw std::runtime_error("Invalid padding");
 
-				if (num_bits == quantum_bits)
+				if (num_bits == FromBaseN::quantum_bits)
 					flushBuffer(ret);
-				buffer = (buffer << shift) | fromSymbol<type>(byte);
-				num_bits += shift;
+				buffer = (buffer << FromBaseN::shift) | fromSymbol<type>(byte);
+				num_bits += FromBaseN::shift;
 			}
 			return ret;
 		}
 
 		std::string complete() override {
-			if (padding_bits >= quantum_bits)
+			if (padding_bits >= FromBaseN::quantum_bits)
 				throw std::runtime_error("Too much padding");
-			if ((num_bits + padding_bits) % quantum_bits != 0)
+			if ((num_bits + padding_bits) % FromBaseN::quantum_bits != 0)
 				throw std::runtime_error("Bad input width");
 			int zero_mask = (1 << (num_bits % 8)) - 1;
 			if (buffer & zero_mask)
@@ -237,17 +238,13 @@ class FromBaseN : public Converter, protected Common<type> {
 			std::string ret;
 			ret.reserve(num_bits >> 3);
 			flushBuffer(ret);
-			if (num_bits >= shift)
+			if (num_bits >= FromBaseN::shift)
 				throw std::runtime_error("Invalid padding");
 			return ret;
 		}
 
 	private:
-		static constexpr size_t shift = shiftWidth<type>();
-		static constexpr size_t quantum_bits = lcm(8, shift);
-		static constexpr size_t quantum_chars = quantum_bits / shift;
-
-		static_assert(quantum_bits < sizeof(uint64_t) * 8);
+		static_assert(FromBaseN::quantum_bits < sizeof(uint64_t) * 8);
 		uint64_t buffer = 0;
 		uint8_t num_bits = 0;
 		uint8_t padding_bits = 0;
