@@ -149,7 +149,17 @@ char fromSymbol<EncodingType::Base64>(char symbol) {
 }
 
 template <EncodingType type>
-class ToBaseN : public Converter {
+class Properties
+{
+};
+
+template <EncodingType type>
+class Common : public Properties<type>
+{
+};
+
+template <EncodingType type>
+class ToBaseN : public Converter, protected Common<type> {
 	public:
 		std::string process(std::string_view data) override {
 			std::string ret;
@@ -192,7 +202,7 @@ class ToBaseN : public Converter {
 };
 
 template <EncodingType type>
-class FromBaseN : public Converter {
+class FromBaseN : public Converter, protected Common<type> {
 	public:
 		std::string process(std::string_view data) override {
 			std::string ret;
