@@ -1,4 +1,5 @@
 #include <array>
+#include <cassert>
 #include <cerrno>
 #include <iostream>
 #include <memory>
@@ -40,6 +41,8 @@ class Binary : public Converter {
 
 constexpr size_t lcm(size_t a, size_t b)
 {
+	assert(a != 0);
+	assert(b != 0);
 	for (size_t i = a; i < a * b; i += a)
 		if (i % b == 0)
 			return i;
