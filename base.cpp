@@ -59,50 +59,6 @@ constexpr size_t lcm(size_t a, size_t b)
 }
 
 template <EncodingType type>
-char fromSymbol(char symbol)
-{
-	(void)symbol;
-	throw std::logic_error("Invalid call");
-}
-
-template <>
-char fromSymbol<EncodingType::Base16>(char symbol) {
-	if (symbol >= '0' && symbol <= '9')
-		return symbol - '0';
-	if (symbol >= 'A' && symbol <= 'F')
-		return 10 + symbol - 'A';
-	if (symbol >= 'a' && symbol <= 'f')
-		return 10 + symbol - 'a';
-	throw std::runtime_error("Not a base16 character");
-}
-
-template <>
-char fromSymbol<EncodingType::Base32>(char symbol) {
-	if (symbol >= 'A' && symbol <= 'Z')
-		return symbol - 'A';
-	if (symbol >= 'a' && symbol <= 'z')
-		return symbol - 'a';
-	if (symbol >= '2' && symbol <= '7')
-		return 26 + symbol - '2';
-	throw std::runtime_error("Not a base32 character");
-}
-
-template <>
-char fromSymbol<EncodingType::Base64>(char symbol) {
-	if (symbol >= 'A' && symbol <= 'Z')
-		return symbol - 'A';
-	if (symbol >= 'a' && symbol <= 'z')
-		return 26 + symbol - 'a';
-	if (symbol >= '0' && symbol <= '9')
-		return 52 + symbol - '0';
-	if (symbol == '+')
-		return 62;
-	if (symbol == '/')
-		return 63;
-	throw std::runtime_error("Not a base64 character");
-}
-
-template <EncodingType type>
 class Properties
 {
 };
@@ -160,6 +116,28 @@ class Common : public Properties<type>
 		static constexpr size_t shift = sizeToShift(Common::symbols.size());
 		static constexpr size_t quantum_bits = lcm(8, shift);
 		static constexpr size_t quantum_chars = quantum_bits / shift;
+
+		static constexpr auto inverse = []() {
+			static_assert(shift < 8);
+			std::array<char, 256> ret{};
+			for (size_t i = 0; i < ret.size(); ++i)
+				ret[i] = -1;
+			for (size_t i = 0; i < Common::symbols.size(); ++i) {
+				const char symbol = Common::symbols[i];
+				ret[symbol] = i;
+				if (symbol >= 'A' && symbol <= 'Z') {
+					const char other = symbol - 'A' + 'a';
+					if (ret[other] == -1)
+						ret[other] = i;
+				}
+				if (symbol >= 'a' && symbol <= 'z') {
+					const char other = symbol - 'a' + 'A';
+					if (ret[other] == -1)
+						ret[other] = i;
+				}
+			}
+			return ret;
+		}();
 
 };
 
@@ -224,7 +202,7 @@ class FromBaseN : public Converter, protected Common<type> {
 
 				if (num_bits == FromBaseN::quantum_bits)
 					flushBuffer(ret);
-				buffer = (buffer << FromBaseN::shift) | fromSymbol<type>(byte);
+				buffer = (buffer << FromBaseN::shift) | fromSymbol(byte);
 				num_bits += FromBaseN::shift;
 			}
 			return ret;
@@ -256,6 +234,13 @@ class FromBaseN : public Converter, protected Common<type> {
 		void flushBuffer(std::string &out) {
 			for (; num_bits >= 8; num_bits -= 8)
 				out += buffer >> (num_bits - 8);
+		}
+
+		char fromSymbol(char symbol) {
+			char ret = FromBaseN::inverse[symbol];
+			if (ret == -1)
+				throw std::runtime_error("Invalid symbol");
+			return ret;
 		}
 };
 
