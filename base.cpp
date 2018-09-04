@@ -39,6 +39,15 @@ class Binary : public Converter {
 		}
 };
 
+constexpr size_t sizeToShift(size_t size) {
+	assert(size != 0);
+	size_t shift = 0;
+	for (; (size & 0x1) == 0; size >>= 1)
+		shift += 1;
+	assert(size == 1);
+	return shift;
+}
+
 constexpr size_t lcm(size_t a, size_t b)
 {
 	assert(a != 0);
@@ -47,30 +56,6 @@ constexpr size_t lcm(size_t a, size_t b)
 		if (i % b == 0)
 			return i;
 	return a * b;
-}
-
-template<EncodingType type>
-constexpr size_t shiftWidth()
-{
-	throw std::logic_error("Invalid call");
-}
-
-template<>
-constexpr size_t shiftWidth<EncodingType::Base16>()
-{
-	return 4;
-}
-
-template<>
-constexpr size_t shiftWidth<EncodingType::Base32>()
-{
-	return 5;
-}
-
-template<>
-constexpr size_t shiftWidth<EncodingType::Base64>()
-{
-	return 6;
 }
 
 template <EncodingType type>
@@ -203,7 +188,7 @@ template <EncodingType type>
 class Common : public Properties<type>
 {
 	public:
-		static constexpr size_t shift = shiftWidth<type>();
+		static constexpr size_t shift = sizeToShift(Common::symbols.size());
 		static constexpr size_t quantum_bits = lcm(8, shift);
 		static constexpr size_t quantum_chars = quantum_bits / shift;
 
