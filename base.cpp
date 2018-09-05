@@ -24,6 +24,8 @@ namespace converter {
 
 class Converter {
 	public:
+		virtual ~Converter() { };
+
 		virtual std::string process(std::string_view data) = 0;
 		virtual std::string complete() = 0;
 };
