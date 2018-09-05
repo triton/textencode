@@ -220,7 +220,7 @@ class FromBaseN : public Converter, protected Common<type> {
 			std::string ret;
 			ret.reserve(data.size());
 			for (char symbol : data) {
-				char byte = FromBaseN::inverse[symbol];
+				const char byte = FromBaseN::inverse[symbol];
 				if (byte == static_cast<char>(CharCodes::Invalid))
 					throw std::runtime_error("Invalid symbol");
 				if (byte == static_cast<char>(CharCodes::Ignore))
@@ -277,8 +277,18 @@ class ToNix32 : public Converter, protected Common<EncodingType::Nix32> {
 		}
 
 		std::string complete() override {
-			std::string ret;
-			ret.reserve((input.size() * 8 + 9) / 5 - 1);
+			std::string ret((input.size() * 8 + 9) / 5 - 1, 0);
+			for (size_t i = 0; i < ret.size(); ++i) {
+				const size_t bit_offset = (ret.size() - i - 1) * 5;
+				const size_t byte_offset = bit_offset >> 3;
+				const size_t byte_shift = bit_offset & 0x7;
+				const int upper = input[byte_offset] & 0xff;
+				const int lower = byte_offset + 1 == input.size() ? 0
+					: input[byte_offset + 1] & 0xff;
+				const char byte = (upper >> byte_shift)
+					| (lower << (8 - byte_shift));
+				ret[i] = symbols[byte & 0x1f];
+			}
 			return ret;
 		}
 
@@ -301,8 +311,15 @@ class FromNix32 : public Converter, protected Common<EncodingType::Nix32> {
 			if (inverse[input[0]] & zero_mask)
 				throw std::runtime_error("Invalid nix32 hash");
 
-			std::string ret;
-			ret.reserve(input.size());
+			std::string ret(input.size() * 5 / 8, 0);
+			for (size_t i = 0; i < input.size(); ++i) {
+				const char byte = inverse[input[input.size() - 1 - i]];
+				const size_t bit_offset = i * 5;
+				const size_t byte_offset = bit_offset >> 3;
+				const size_t byte_shift = bit_offset & 0x7;
+				ret[byte_offset] |= byte << byte_shift;
+				ret[byte_offset + 1] |= byte >> (8 - byte_shift);
+			}
 			return ret;
 		}
 
