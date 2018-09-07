@@ -49,3 +49,9 @@ vgcore.*
 
 # Output binaries
 /src/textencode/textencode
+/test/base_n
+/test/binary
+/test/internal/base_n
+/test/internal/nix
+/test/internal/utils
+/test/nix
