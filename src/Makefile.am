@@ -35,6 +35,6 @@ if BUILD_CLI
 
 bin_PROGRAMS += textencode/textencode
 textencode_textencode_SOURCES = textencode/main.cpp
-textencode_textencode_LDADD = $(TEXTENCODE_LIBS)
+textencode_textencode_LDADD = libtextencode.la $(COMMON_LIBS)
 
 endif
