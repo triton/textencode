@@ -1,6 +1,6 @@
 # Initialization
 AC_PREREQ([2.69])
-AC_INIT([textencode], [0.1.1], [https://github.com/triton/textencode/issues])
+AC_INIT([textencode], [0.1.2], [https://github.com/triton/textencode/issues])
 AC_LANG([C++])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIRS([m4])
